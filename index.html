@@ -278,61 +278,54 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <!-- BARCODE SCANNER -->
-<div class="scanner-overlay" id="scannerOverlay">
+<div id="scannerOverlay" style="display:none;position:fixed;inset:0;z-index:200;background:#111;flex-direction:column;">
 
-  <!-- SCANNING VIEW -->
-  <div id="scannerActive" style="display:flex;flex-direction:column;height:100%;">
-    <div class="scanner-topbar">
-      <span>📦 Scan barcode</span>
-      <button class="scanner-close" onclick="cancelScanner()">Cancel</button>
-    </div>
-    <div class="scanner-wrap" style="flex:1;">
-      <video id="scannerVideo" playsinline autoplay muted></video>
-      <div class="scanner-frame">
-        <div class="scanner-box"></div>
-        <div class="scanner-line"></div>
-      </div>
-    </div>
-    <div class="scanner-hint" id="scannerHint">Point camera at the barcode — hold steady</div>
+  <!-- OPTIONS VIEW - always visible -->
+  <div style="background:#0f5a8a;padding:16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+    <span style="color:#fff;font-size:16px;font-weight:700;">📦 Add item</span>
+    <button onclick="closeScanner()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:8px 16px;border-radius:20px;font-size:14px;cursor:pointer;">✕ Close</button>
   </div>
 
-  <!-- CANCEL OPTIONS VIEW -->
-  <div id="scannerFallback" style="display:none;flex-direction:column;height:100%;background:#111;">
-    <div class="scanner-topbar">
-      <span>📦 Add item</span>
-      <button class="scanner-close" onclick="closeScanner()">Close</button>
-    </div>
-    <div style="flex:1;padding:28px 20px;">
-      <div style="color:#fff;font-size:18px;font-weight:700;margin-bottom:6px;">How would you like to add this item?</div>
-      <div style="color:rgba(255,255,255,0.5);font-size:13px;margin-bottom:28px;">Barcode not scanned — choose an option below</div>
+  <div style="flex:1;overflow-y:auto;padding:24px 16px;">
 
-      <div style="background:#1e1e1e;border-radius:14px;padding:18px;margin-bottom:12px;">
-        <div style="color:#fff;font-size:15px;font-weight:600;margin-bottom:6px;">📦 Enter barcode number</div>
-        <div style="color:rgba(255,255,255,0.45);font-size:12px;margin-bottom:12px;">Type the digits printed under the barcode lines on the packaging</div>
-        <div style="display:flex;gap:8px;">
-          <input id="manualBarcode" type="number" placeholder="e.g. 5740900285017" style="flex:1;padding:11px;border-radius:8px;border:none;font-size:15px;background:#fff;"/>
-          <button onclick="submitManual()" style="padding:11px 18px;background:#4ade80;color:#000;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:14px;">Look up</button>
-        </div>
+    <!-- BARCODE LOOKUP -->
+    <div style="background:#1e1e1e;border-radius:14px;padding:18px;margin-bottom:12px;">
+      <div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:4px;">📦 Look up by barcode</div>
+      <div style="color:rgba(255,255,255,0.45);font-size:12px;margin-bottom:14px;">Type the number printed under the barcode on the packaging</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input id="manualBarcode" type="number" placeholder="e.g. 5740900285017" style="flex:1;padding:11px;border-radius:8px;border:none;font-size:15px;background:#fff;"/>
+        <button onclick="submitManual()" style="padding:11px 18px;background:#4ade80;color:#000;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:14px;">Look up</button>
       </div>
+      <button onclick="startCameraScan()" style="width:100%;padding:10px;background:#185FA5;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">📷 Or scan with camera</button>
+    </div>
 
-      <div style="background:#1e1e1e;border-radius:14px;padding:18px;margin-bottom:20px;">
-        <div style="color:#fff;font-size:15px;font-weight:600;margin-bottom:6px;">✏ Fill in manually</div>
-        <div style="color:rgba(255,255,255,0.45);font-size:12px;margin-bottom:12px;">Type the item name and details yourself in the form</div>
-        <button onclick="closeScanner()" style="width:100%;padding:12px;background:#374151;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">Go to manual form</button>
+    <!-- MANUAL ENTRY -->
+    <div style="background:#1e1e1e;border-radius:14px;padding:18px;margin-bottom:12px;">
+      <div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:4px;">✏ Fill in manually</div>
+      <div style="color:rgba(255,255,255,0.45);font-size:12px;margin-bottom:14px;">Skip lookup and type the item details yourself</div>
+      <button onclick="closeScanner()" style="width:100%;padding:12px;background:#374151;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">Go to form →</button>
+    </div>
+
+    <!-- LOOKUP RESULT -->
+    <div id="scannerResult" style="display:none;background:#fff;border-radius:14px;padding:18px;">
+      <div style="font-size:11px;font-weight:700;color:#4ade80;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Product found!</div>
+      <div id="scannerName" style="font-size:16px;font-weight:700;color:#111;margin-bottom:4px;"></div>
+      <div id="scannerMeta" style="font-size:13px;color:#6b7280;margin-bottom:14px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="useScanResult()" style="flex:1;padding:12px;background:#0f5a8a;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">Use this product</button>
+        <button onclick="document.getElementById('scannerResult').style.display='none'" style="padding:12px 16px;background:#f3f4f6;color:#374151;border:none;border-radius:8px;font-size:14px;cursor:pointer;">Cancel</button>
       </div>
-
-      <button onclick="retryScanner()" style="width:100%;padding:12px;background:transparent;color:rgba(255,255,255,0.35);border:1px solid rgba(255,255,255,0.12);border-radius:8px;font-size:13px;cursor:pointer;">Try scanning again</button>
     </div>
-  </div>
 
-  <!-- RESULT VIEW -->
-  <div class="scanner-result" id="scannerResult">
-    <h3 id="scannerName"></h3>
-    <p id="scannerMeta"></p>
-    <div class="actions">
-      <button class="btn btn-edit" onclick="useScanResult()">Use this product</button>
-      <button class="btn btn-close" onclick="retryScanner()">Scan again</button>
+    <!-- CAMERA VIEW -->
+    <div id="scannerCameraWrap" style="display:none;border-radius:14px;overflow:hidden;margin-top:4px;position:relative;">
+      <video id="scannerVideo" playsinline autoplay muted style="width:100%;display:block;"></video>
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+        <div style="width:220px;height:120px;border:3px solid #4ade80;border-radius:10px;box-shadow:0 0 0 2000px rgba(0,0,0,0.5);"></div>
+      </div>
+      <button onclick="stopCameraScan()" style="width:100%;padding:12px;background:#374151;color:#fff;border:none;font-size:14px;cursor:pointer;">Stop camera</button>
     </div>
+
   </div>
 </div>
 
@@ -828,92 +821,71 @@ function closeSheet() {
 setInterval(()=>{ if(scriptUrl && navigator.onLine) syncFromSheet(); }, 60000);
 
 // ─── BARCODE SCANNER ─────────────────────────────────────
-let scannerStream = null;
 let scanResult = null;
 let quaggaRunning = false;
-let scanTimeout = null;
 
-function showFallback() {
-  stopQuagga();
-  document.getElementById('scannerActive').style.display = 'none';
-  document.getElementById('scannerFallback').style.display = 'flex';
-  document.getElementById('scannerResult').classList.remove('show');
+function openScanner() {
+  document.getElementById('scannerOverlay').style.display = 'flex';
+  document.getElementById('scannerResult').style.display = 'none';
+  document.getElementById('manualBarcode').value = '';
+  stopCameraScan();
 }
 
-function showScanning() {
-  document.getElementById('scannerActive').style.display = 'flex';
-  document.getElementById('scannerFallback').style.display = 'none';
-  document.getElementById('scannerResult').classList.remove('show');
-  document.getElementById('scannerHint').textContent = 'Point camera at the barcode — hold steady';
+function closeScanner() {
+  stopCameraScan();
+  document.getElementById('scannerOverlay').style.display = 'none';
 }
 
-async function openScanner() {
-  document.getElementById('scannerOverlay').classList.add('open');
-  showScanning();
-  document.getElementById('scannerHint').textContent = 'Loading scanner…';
+async function startCameraScan() {
+  document.getElementById('scannerCameraWrap').style.display = 'block';
   try {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js');
-    document.getElementById('scannerHint').textContent = 'Point camera at the barcode — hold steady';
-    startQuagga();
+    if (quaggaRunning) { try { Quagga.stop(); } catch(e){} quaggaRunning = false; }
+    Quagga.init({
+      inputStream: {
+        name: 'Live', type: 'LiveStream',
+        target: document.getElementById('scannerVideo').parentElement,
+        constraints: { facingMode: 'environment', width:{min:640}, height:{min:480} },
+      },
+      locator: { patchSize: 'medium', halfSample: true },
+      numOfWorkers: 2, frequency: 10,
+      decoder: { readers: ['ean_reader','ean_8_reader','upc_reader','upc_e_reader'] },
+      locate: true
+    }, err => {
+      if (err) { document.getElementById('scannerCameraWrap').style.display = 'none'; return; }
+      Quagga.start();
+      quaggaRunning = true;
+    });
+    let lastCode = '';
+    Quagga.onDetected(result => {
+      const code = result.codeResult.code;
+      if (code === lastCode) {
+        stopCameraScan();
+        document.getElementById('manualBarcode').value = code;
+        submitManual();
+      }
+      lastCode = code;
+      setTimeout(() => { lastCode = ''; }, 1500);
+    });
   } catch(e) {
-    showFallback();
+    document.getElementById('scannerCameraWrap').style.display = 'none';
   }
 }
 
-function startQuagga() {
+function stopCameraScan() {
   if (quaggaRunning) { try { Quagga.stop(); } catch(e){} quaggaRunning = false; }
-  Quagga.init({
-    inputStream: {
-      name: 'Live', type: 'LiveStream',
-      target: document.getElementById('scannerVideo').parentElement,
-      constraints: { facingMode: 'environment', width:{min:640}, height:{min:480} },
-    },
-    locator: { patchSize: 'medium', halfSample: true },
-    numOfWorkers: 2, frequency: 10,
-    decoder: { readers: ['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader'] },
-    locate: true
-  }, err => {
-    if (err) { showFallback(); return; }
-    Quagga.start();
-    quaggaRunning = true;
-  });
-  let lastCode = '';
-  Quagga.onDetected(result => {
-    const code = result.codeResult.code;
-    if (code === lastCode) { stopQuagga(); lookupBarcode(code); }
-    lastCode = code;
-    setTimeout(() => { lastCode = ''; }, 1500);
-  });
-}
-
-function stopQuagga() {
-  if (quaggaRunning) { try { Quagga.stop(); } catch(e){} quaggaRunning = false; }
-}
-
-// Cancel = stop scanning, show the two options
-function cancelScanner() { showFallback(); }
-
-// Close = close the whole overlay, go back to form
-function closeScanner() {
-  stopQuagga();
-  document.getElementById('scannerOverlay').classList.remove('open');
-}
-
-function retryScanner() {
-  showScanning();
-  startQuagga();
+  const wrap = document.getElementById('scannerCameraWrap');
+  if (wrap) wrap.style.display = 'none';
 }
 
 function submitManual() {
   const code = document.getElementById('manualBarcode').value.trim();
   if (!code) return;
-  document.getElementById('scannerFallback').style.display = 'none';
   lookupBarcode(code);
 }
 
 async function lookupBarcode(code) {
-  stopQuagga();
-  document.getElementById('scannerHint').textContent = 'Looking up product…';
+  document.getElementById('scannerResult').style.display = 'none';
   try {
     // Try Open Food Facts world + Denmark
     let data = null;
@@ -934,16 +906,13 @@ async function lookupBarcode(code) {
       document.getElementById('scannerName').textContent = displayName || 'Unknown product';
       document.getElementById('scannerMeta').textContent =
         [scanResult.quantity, 'Barcode: ' + code].filter(Boolean).join(' · ');
-      document.getElementById('scannerResult').classList.add('show');
-      document.getElementById('scannerHint').style.display = 'none';
+      document.getElementById('scannerResult').style.display = 'block';
     } else {
-      document.getElementById('scannerHint').textContent = 'Product not found for barcode ' + code + '. Try manual entry.';
       document.getElementById('manualBarcode').value = code;
-      document.getElementById('manualEntry').style.display = 'block';
+      alert('Product not found for barcode ' + code + '. Try a different barcode or fill in manually.');
     }
   } catch(e) {
-    document.getElementById('scannerHint').textContent = 'Lookup failed — check internet connection.';
-    document.getElementById('manualEntry').style.display = 'block';
+    alert('Lookup failed — check internet connection.');
   }
 }
 
