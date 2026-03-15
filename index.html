@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Freezer"/>
+<meta name="theme-color" content="#0f5a8a"/>
+<link rel="manifest" href="manifest.json"/>
+<title>❄ Freezer Tracker</title>
+<style>
+:root{
+  --blue:#0f5a8a;--blue2:#1a7cc4;--blue-light:#e8f4fd;
+  --red:#b91c1c;--red-light:#fef2f2;
+  --orange:#c2610c;--orange-light:#fff7ed;
+  --green:#166534;--green-light:#f0fdf4;
+  --gray:#6b7280;--gray-light:#f9fafb;--gray-mid:#e5e7eb;
+  --text:#111827;--text2:#374151;--text3:#6b7280;
+  --white:#fff;--r:12px;--rs:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#eef2f7;color:var(--text);min-height:100vh;overscroll-behavior:none;}
+
+/* VIEWS */
+.view{display:none;min-height:100vh;flex-direction:column;}
+.view.active{display:flex;}
+
+/* TOP BAR */
+.topbar{background:var(--blue);color:#fff;padding:14px 16px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.topbar h1{font-size:17px;font-weight:700;letter-spacing:-0.3px;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.sync-pill{font-size:11px;background:rgba(255,255,255,0.15);padding:3px 9px;border-radius:20px;display:flex;align-items:center;gap:5px;}
+.dot{width:6px;height:6px;border-radius:50%;}
+.dot.green{background:#4ade80;}
+.dot.yellow{background:#fbbf24;}
+.dot.red{background:#f87171;}
+.icon-btn{background:rgba(255,255,255,0.15);border:none;color:#fff;width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px;}
+.stat{background:#fff;border-radius:var(--rs);padding:11px 10px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.07);}
+.stat-n{font-size:24px;font-weight:700;line-height:1;}
+.stat-n.warn{color:var(--orange);}
+.stat-n.danger{color:var(--red);}
+.stat-l{font-size:10px;color:var(--text3);margin-top:3px;line-height:1.2;}
+
+/* TOOLBAR */
+.toolbar{display:flex;gap:8px;padding:0 12px 10px;}
+.search-wrap{flex:1;position:relative;}
+.search-wrap input{width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--gray-mid);border-radius:var(--rs);font-size:14px;background:#fff;color:var(--text);outline:none;}
+.search-wrap input:focus{border-color:var(--blue2);}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text3);pointer-events:none;}
+.scan-btn{background:var(--blue2);color:#fff;border:none;border-radius:var(--rs);padding:0 14px;font-size:22px;cursor:pointer;}
+
+/* CATS */
+.cats{display:flex;gap:6px;padding:0 12px 10px;overflow-x:auto;scrollbar-width:none;}
+.cats::-webkit-scrollbar{display:none;}
+.cat{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--gray-mid);color:var(--text3);background:#fff;white-space:nowrap;flex-shrink:0;transition:all 0.15s;}
+.cat.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+
+/* ALERTS */
+.alerts{padding:0 12px 8px;}
+.alert-box{border-radius:var(--rs);padding:10px 12px;margin-bottom:6px;}
+.alert-box.warn{background:var(--orange-light);border:1px solid #fed7aa;}
+.alert-box.danger{background:var(--red-light);border:1px solid #fca5a5;}
+.alert-title{font-size:12px;font-weight:700;margin-bottom:4px;}
+.alert-box.warn .alert-title{color:var(--orange);}
+.alert-box.danger .alert-title{color:var(--red);}
+.alert-row{font-size:12px;color:var(--text2);padding:1px 0;display:flex;justify-content:space-between;}
+
+/* SECTION HEAD */
+.sec{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;padding:0 12px 6px;}
+
+/* ITEMS */
+.items{padding:0 12px;display:flex;flex-direction:column;gap:7px;padding-bottom:100px;}
+.item{background:#fff;border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,0.07);cursor:pointer;border-left:3px solid transparent;}
+.item:active{opacity:0.75;}
+.item.warn{border-left-color:var(--orange);}
+.item.danger{border-left-color:var(--red);}
+.iicon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:23px;flex-shrink:0;}
+.ibody{flex:1;min-width:0;}
+.iname{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.isub{font-size:12px;color:var(--text3);margin-top:2px;}
+.iright{text-align:right;flex-shrink:0;}
+.abadge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;}
+.abadge.fresh{background:var(--green-light);color:var(--green);}
+.abadge.ok{background:var(--gray-light);color:var(--gray);}
+.abadge.warn{background:var(--orange-light);color:var(--orange);}
+.abadge.danger{background:var(--red-light);color:var(--red);}
+.iqty{font-size:11px;color:var(--text3);margin-top:3px;}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px 20px;color:var(--text3);}
+.empty div{font-size:40px;margin-bottom:10px;}
+
+/* FAB */
+.fab{position:fixed;bottom:22px;right:16px;z-index:40;background:var(--blue2);color:#fff;border:none;border-radius:50%;width:58px;height:58px;font-size:28px;cursor:pointer;box-shadow:0 4px 16px rgba(26,124,196,0.5);display:flex;align-items:center;justify-content:center;}
+
+/* SHEET (bottom drawer) */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:100;}
+.overlay.open{display:block;}
+.sheet{position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:20px 20px 0 0;z-index:101;max-height:93vh;overflow-y:auto;transform:translateY(100%);transition:transform 0.3s cubic-bezier(0.32,0.72,0,1);}
+.sheet.open{transform:translateY(0);}
+.sheet-handle{width:36px;height:4px;background:var(--gray-mid);border-radius:2px;margin:12px auto 0;}
+.sheet-body{padding:16px 20px 40px;}
+.sheet-title{font-size:18px;font-weight:700;margin-bottom:4px;}
+.cat-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:var(--blue-light);color:var(--blue);margin-bottom:14px;}
+
+/* DETAIL ROWS */
+.drows{border:1px solid var(--gray-mid);border-radius:var(--rs);overflow:hidden;margin-bottom:14px;}
+.drow{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;font-size:14px;border-bottom:1px solid var(--gray-mid);}
+.drow:last-child{border-bottom:none;}
+.drow span:first-child{color:var(--text3);}
+.drow span:last-child{font-weight:600;max-width:55%;text-align:right;}
+.drow span:last-child.danger{color:var(--red);}
+.drow span:last-child.warn{color:var(--orange);}
+.drow span:last-child.fresh{color:var(--green);}
+
+/* QR DISPLAY */
+.qr-area{background:var(--gray-light);border-radius:var(--rs);padding:14px;text-align:center;margin-bottom:14px;}
+.qr-code{width:100px;height:100px;margin:0 auto 8px;background:#fff;border:1px solid var(--gray-mid);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3);line-height:1.4;}
+.qr-id{font-size:12px;font-family:monospace;color:var(--text3);}
+
+/* ACTION BTNS */
+.actions{display:flex;gap:8px;}
+.btn{flex:1;padding:12px;border-radius:var(--rs);font-size:14px;font-weight:600;cursor:pointer;border:none;text-align:center;}
+.btn-use{background:var(--red-light);color:var(--red);}
+.btn-edit{background:var(--blue-light);color:var(--blue2);}
+.btn-close{background:var(--gray-light);color:var(--text2);}
+
+/* ADD FORM */
+.form-title{font-size:18px;font-weight:700;margin-bottom:16px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1.5px solid var(--gray-mid);border-radius:var(--rs);font-size:15px;color:var(--text);background:#fff;outline:none;font-family:inherit;}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--blue2);}
+.field textarea{resize:none;height:70px;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.cat-opt{border:1.5px solid var(--gray-mid);border-radius:var(--rs);padding:10px 6px;text-align:center;cursor:pointer;font-size:12px;font-weight:600;color:var(--text3);background:#fff;}
+.cat-opt.selected{border-color:var(--blue2);background:var(--blue-light);color:var(--blue);}
+.cat-opt .emoji{font-size:22px;display:block;margin-bottom:4px;}
+.btn-add{width:100%;padding:14px;background:var(--blue2);color:#fff;border:none;border-radius:var(--rs);font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;}
+.btn-add:active{opacity:0.85;}
+
+/* SETUP VIEW */
+.setup-wrap{padding:24px 20px;flex:1;}
+.setup-wrap h2{font-size:20px;font-weight:700;margin-bottom:8px;}
+.setup-wrap p{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:16px;}
+.setup-wrap .field input{font-size:13px;}
+.btn-setup{width:100%;padding:14px;background:var(--blue2);color:#fff;border:none;border-radius:var(--rs);font-size:16px;font-weight:700;cursor:pointer;margin-top:4px;}
+.step{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px;}
+.step-n{width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.step-text{font-size:13px;color:var(--text2);line-height:1.6;}
+.step-text a{color:var(--blue2);}
+.step-text code{background:var(--gray-light);padding:1px 5px;border-radius:4px;font-size:12px;}
+.notice{background:var(--blue-light);border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--blue);line-height:1.5;margin-bottom:16px;}
+</style>
+</head>
+<body>
+
+<!-- MAIN VIEW -->
+<div class="view active" id="view-main">
+  <div class="topbar">
+    <h1>❄ Freezer Tracker</h1>
+    <div class="topbar-right">
+      <div class="sync-pill"><span class="dot" id="syncDot"></span><span id="syncLabel">Checking...</span></div>
+      <button class="icon-btn" onclick="showSetup()" title="Settings">⚙</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-n" id="statTotal">—</div><div class="stat-l">Total items</div></div>
+    <div class="stat"><div class="stat-n warn" id="statWarn">—</div><div class="stat-l">Expiring soon</div></div>
+    <div class="stat"><div class="stat-n danger" id="statDanger">—</div><div class="stat-l">Over 6 months</div></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="Search items..." oninput="render()"/>
+    </div>
+    <button class="scan-btn" onclick="startScan()" title="Scan QR">📷</button>
+  </div>
+
+  <div class="cats" id="catBar"></div>
+  <div class="alerts" id="alertBox"></div>
+  <div class="sec" id="listLabel"></div>
+  <div class="items" id="itemList"></div>
+
+  <button class="fab" onclick="openAdd()">+</button>
+</div>
+
+<!-- BOTTOM OVERLAY -->
+<div class="overlay" id="overlay" onclick="closeSheet()"></div>
+
+<!-- DETAIL SHEET -->
+<div class="sheet" id="detailSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-body" id="detailBody"></div>
+</div>
+
+<!-- ADD SHEET -->
+<div class="sheet" id="addSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-body">
+    <div class="form-title" id="addTitle">Add item to freezer</div>
+    <div class="field">
+      <label>Category</label>
+      <div class="cat-grid" id="catGrid"></div>
+    </div>
+    <div class="field">
+      <label>Item name</label>
+      <input type="text" id="f-name" placeholder="e.g. Chicken breast"/>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Amount</label>
+        <input type="text" id="f-amount" placeholder="e.g. 2 portions"/>
+      </div>
+      <div class="field">
+        <label>Weight / Size</label>
+        <input type="text" id="f-size" placeholder="e.g. 500g"/>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Date frozen</label>
+        <input type="date" id="f-date"/>
+      </div>
+      <div class="field">
+        <label>Best before</label>
+        <input type="date" id="f-bestbefore"/>
+      </div>
+    </div>
+    <div class="field">
+      <label>Notes (brand, raw/cooked, location in freezer…)</label>
+      <textarea id="f-note" placeholder="Optional notes"></textarea>
+    </div>
+    <button class="btn-add" onclick="saveItem()">Save &amp; Generate QR Label</button>
+  </div>
+</div>
+
+<!-- SETUP SHEET -->
+<div class="sheet" id="setupSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-body setup-wrap">
+    <h2>⚙ Setup &amp; Settings</h2>
+    <p>Connect the app to your Google Sheet so all phones share the same live database.</p>
+    <div class="notice">📋 The app works fully offline — it reads from local cache when no internet is available. Changes made offline will sync when you reconnect.</div>
+    <div class="step"><div class="step-n">1</div><div class="step-text">Open <a href="https://sheets.google.com" target="_blank">Google Sheets</a> and create a new spreadsheet named <strong>Freezer Database</strong>.</div></div>
+    <div class="step"><div class="step-n">2</div><div class="step-text">Open the <strong>Apps Script</strong> editor (Extensions → Apps Script) and paste in the script from <code>google-apps-script.js</code> included with this app. Click Deploy → New deployment → Web app. Set access to <em>Anyone</em>. Copy the URL.</div></div>
+    <div class="step"><div class="step-n">3</div><div class="step-text">Paste your Apps Script Web App URL below.</div></div>
+    <div class="field">
+      <label>Google Apps Script URL</label>
+      <input type="url" id="scriptUrl" placeholder="https://script.google.com/macros/s/…/exec"/>
+    </div>
+    <button class="btn-setup" onclick="saveSettings()">Save &amp; Connect</button>
+    <br/><br/>
+    <div class="step"><div class="step-n">4</div><div class="step-text">Share this <code>index.html</code> file with everyone in the household — they open it in their phone browser and tap <em>Add to Home Screen</em>. No app store needed.</div></div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────
+const CATS = [
+  {id:'meat',   label:'Meat',      emoji:'🥩', bg:'#fff0ee'},
+  {id:'fish',   label:'Fish',      emoji:'🐟', bg:'#e8f4fd'},
+  {id:'bread',  label:'Bread',     emoji:'🍞', bg:'#fffbeb'},
+  {id:'pizza',  label:'Pizza',     emoji:'🍕', bg:'#fdf4ff'},
+  {id:'veggie', label:'Veg',       emoji:'🥦', bg:'#f0fdf4'},
+  {id:'dairy',  label:'Dairy',     emoji:'🧀', bg:'#fffbeb'},
+  {id:'icecream',label:'Ice cream',emoji:'🍦', bg:'#eff6ff'},
+  {id:'ready',  label:'Ready meal',emoji:'🍱', bg:'#fdf4ff'},
+  {id:'other',  label:'Other',     emoji:'📦', bg:'#f9fafb'},
+];
+const WARN_DAYS  = 150; // 5 months
+const LIMIT_DAYS = 180; // 6 months
+const CACHE_KEY  = 'freezer_items_v1';
+const URL_KEY    = 'freezer_script_url';
+
+// ─── STATE ───────────────────────────────────────────────
+let items = [];
+let activeCat = 'all';
+let editingId = null;
+let scriptUrl = localStorage.getItem(URL_KEY) || '';
+
+// ─── INIT ─────────────────────────────────────────────────
+window.onload = () => {
+  buildCatBar();
+  buildCatGrid();
+  document.getElementById('f-date').value = today();
+  loadLocal();
+  if (scriptUrl) syncFromSheet();
+  else setSyncStatus('offline');
+  if (!scriptUrl) setTimeout(showSetup, 800);
+};
+
+function today() {
+  return new Date().toISOString().slice(0,10);
+}
+
+// ─── SYNC STATUS ──────────────────────────────────────────
+function setSyncStatus(state, label) {
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  if (state==='ok')      { dot.className='dot green'; lbl.textContent = label||'Synced'; }
+  else if (state==='warn'){ dot.className='dot yellow'; lbl.textContent = label||'Syncing…'; }
+  else                   { dot.className='dot red';   lbl.textContent = label||'Offline'; }
+}
+
+// ─── LOCAL CACHE ─────────────────────────────────────────
+function saveLocal() { localStorage.setItem(CACHE_KEY, JSON.stringify(items)); }
+function loadLocal() {
+  const raw = localStorage.getItem(CACHE_KEY);
+  if (raw) { items = JSON.parse(raw); render(); }
+}
+
+// ─── GOOGLE SHEETS SYNC ───────────────────────────────────
+async function syncFromSheet() {
+  setSyncStatus('warn','Syncing…');
+  try {
+    const res = await fetch(scriptUrl + '?action=getAll', {cache:'no-store'});
+    const data = await res.json();
+    if (data.items) {
+      items = data.items;
+      saveLocal();
+      render();
+      setSyncStatus('ok', 'Synced ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+    }
+  } catch(e) {
+    setSyncStatus('offline','Offline — cached');
+  }
+}
+
+async function pushToSheet(action, payload) {
+  if (!scriptUrl) return;
+  try {
+    await fetch(scriptUrl, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action, ...payload})
+    });
+    syncFromSheet();
+  } catch(e) {
+    setSyncStatus('offline','Offline — will retry');
+    queueOfflineAction({action, ...payload});
+  }
+}
+
+// ─── OFFLINE QUEUE ────────────────────────────────────────
+function queueOfflineAction(payload) {
+  const q = JSON.parse(localStorage.getItem('freezer_queue')||'[]');
+  q.push(payload);
+  localStorage.setItem('freezer_queue', JSON.stringify(q));
+}
+async function flushQueue() {
+  const q = JSON.parse(localStorage.getItem('freezer_queue')||'[]');
+  if (!q.length) return;
+  for (const p of q) {
+    try {
+      await fetch(scriptUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p)});
+    } catch(e) { return; }
+  }
+  localStorage.removeItem('freezer_queue');
+  syncFromSheet();
+}
+window.addEventListener('online', flushQueue);
+
+// ─── BUILD UI ─────────────────────────────────────────────
+function buildCatBar() {
+  const bar = document.getElementById('catBar');
+  bar.innerHTML = `<span class="cat active" onclick="setCat(this,'all')">All</span>`;
+  CATS.forEach(c => {
+    const s = document.createElement('span');
+    s.className = 'cat';
+    s.textContent = c.emoji + ' ' + c.label;
+    s.onclick = () => setCat(s, c.id);
+    bar.appendChild(s);
+  });
+}
+function buildCatGrid() {
+  const g = document.getElementById('catGrid');
+  g.innerHTML = '';
+  CATS.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'cat-opt';
+    d.id = 'copt-'+c.id;
+    d.innerHTML = `<span class="emoji">${c.emoji}</span>${c.label}`;
+    d.onclick = () => selectCat(c.id);
+    g.appendChild(d);
+  });
+}
+function setCat(el, id) {
+  document.querySelectorAll('.cats .cat').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  activeCat = id;
+  render();
+}
+function selectCat(id) {
+  document.querySelectorAll('.cat-opt').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('copt-'+id)?.classList.add('selected');
+}
+
+// ─── RENDER ───────────────────────────────────────────────
+function render() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const now = Date.now();
+  let filtered = items.filter(i => {
+    if (activeCat !== 'all' && i.cat !== activeCat) return false;
+    if (q && !i.name.toLowerCase().includes(q) && !(i.note||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  // Stats (global)
+  const total = items.length;
+  const warn  = items.filter(i => ageStatus(i) === 'warn').length;
+  const danger= items.filter(i => ageStatus(i) === 'danger').length;
+  document.getElementById('statTotal').textContent  = total;
+  document.getElementById('statWarn').textContent   = warn;
+  document.getElementById('statDanger').textContent = danger;
+
+  // Alerts
+  const abox = document.getElementById('alertBox');
+  const expired = items.filter(i => ageStatus(i)==='danger');
+  const expiring = items.filter(i => ageStatus(i)==='warn');
+  let html = '';
+  if (expired.length) {
+    html += `<div class="alert-box danger"><div class="alert-title">⚠ Over 6 months — use or discard</div>`;
+    expired.forEach(i => html += `<div class="alert-row"><span>${i.name}</span><span>${ageDays(i)}d in freezer</span></div>`);
+    html += `</div>`;
+  }
+  if (expiring.length) {
+    html += `<div class="alert-box warn"><div class="alert-title">🕐 Expiring within 1 month</div>`;
+    expiring.forEach(i => html += `<div class="alert-row"><span>${i.name}</span><span>${ageDays(i)}d in freezer</span></div>`);
+    html += `</div>`;
+  }
+  abox.innerHTML = html;
+
+  // List
+  const lbl = document.getElementById('listLabel');
+  lbl.textContent = filtered.length ? filtered.length + ' item' + (filtered.length>1?'s':'') + (activeCat!=='all'?' in '+CATS.find(c=>c.id===activeCat)?.label:'') : '';
+
+  const list = document.getElementById('itemList');
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty"><div>🫙</div>No items found</div>`;
+    return;
+  }
+  list.innerHTML = '';
+  filtered.sort((a,b) => ageDays(b)-ageDays(a));
+  filtered.forEach(item => {
+    const st = ageStatus(item);
+    const cat = CATS.find(c=>c.id===item.cat)||CATS[CATS.length-1];
+    const d = document.createElement('div');
+    d.className = 'item ' + (st==='danger'?'danger':st==='warn'?'warn':'');
+    d.innerHTML = `
+      <div class="iicon" style="background:${cat.bg}">${cat.emoji}</div>
+      <div class="ibody">
+        <div class="iname">${item.name}</div>
+        <div class="isub">${item.amount||''} ${item.size?'· '+item.size:''}</div>
+      </div>
+      <div class="iright">
+        <div class="abadge ${st}">${ageLabel(item)}</div>
+        <div class="iqty">${item.note||''}</div>
+      </div>`;
+    d.onclick = () => openDetail(item);
+    list.appendChild(d);
+  });
+}
+
+// ─── AGE HELPERS ─────────────────────────────────────────
+function ageDays(item) {
+  const d = new Date(item.dateIn);
+  return Math.floor((Date.now()-d.getTime())/86400000);
+}
+function ageStatus(item) {
+  const d = ageDays(item);
+  if (d >= LIMIT_DAYS) return 'danger';
+  if (d >= WARN_DAYS)  return 'warn';
+  if (d >= 60)         return 'ok';
+  return 'fresh';
+}
+function ageLabel(item) {
+  const d = ageDays(item);
+  if (d < 30) return d + 'd';
+  return (d/30).toFixed(1) + 'mo';
+}
+
+// ─── DETAIL SHEET ─────────────────────────────────────────
+function openDetail(item) {
+  const cat = CATS.find(c=>c.id===item.cat)||CATS[CATS.length-1];
+  const st = ageStatus(item);
+  const d = ageDays(item);
+  const dateIn = new Date(item.dateIn).toLocaleDateString('en-GB');
+  const dateOut = new Date(new Date(item.dateIn).getTime()+LIMIT_DAYS*86400000).toLocaleDateString('en-GB');
+  const remaining = LIMIT_DAYS - d;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent('FRZ:'+item.id)}`;
+
+  document.getElementById('detailBody').innerHTML = `
+    <div class="qr-area">
+      <img src="${qrUrl}" width="100" height="100" style="border-radius:6px;display:block;margin:0 auto 8px;" loading="lazy"/>
+      <div class="qr-id">${item.id}</div>
+    </div>
+    <div class="sheet-title">${cat.emoji} ${item.name}</div>
+    <div class="cat-pill">${cat.label}</div>
+    <div class="drows">
+      <div class="drow"><span>Amount</span><span>${item.amount||'—'}</span></div>
+      <div class="drow"><span>Size / Weight</span><span>${item.size||'—'}</span></div>
+      <div class="drow"><span>Date frozen</span><span>${dateIn}</span></div>
+      <div class="drow"><span>Age in freezer</span><span class="${st}">${ageLabel(item)} (${d} days)</span></div>
+      <div class="drow"><span>6-month limit</span><span class="${d>=LIMIT_DAYS?'danger':''}">${dateOut}</span></div>
+      <div class="drow"><span>Days remaining</span><span class="${remaining<=0?'danger':remaining<=30?'warn':'fresh'}">${remaining<=0?'Overdue!':remaining+' days'}</span></div>
+      <div class="drow"><span>Best before</span><span>${item.bestBefore||'—'}</span></div>
+      <div class="drow"><span>Notes</span><span>${item.note||'—'}</span></div>
+      <div class="drow"><span>Added by</span><span>${item.addedBy||'—'}</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-use" onclick="removeItem('${item.id}')">✓ Mark as used</button>
+      <button class="btn btn-edit" onclick="openEdit('${item.id}')">✏ Edit</button>
+      <button class="btn btn-close" onclick="closeSheet()">Close</button>
+    </div>`;
+  openSheet('detailSheet');
+}
+
+// ─── ADD / EDIT ───────────────────────────────────────────
+function openAdd() {
+  editingId = null;
+  document.getElementById('addTitle').textContent = 'Add item to freezer';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-amount').value = '';
+  document.getElementById('f-size').value = '';
+  document.getElementById('f-date').value = today();
+  document.getElementById('f-bestbefore').value = '';
+  document.getElementById('f-note').value = '';
+  document.querySelectorAll('.cat-opt').forEach(c=>c.classList.remove('selected'));
+  openSheet('addSheet');
+}
+function openEdit(id) {
+  const item = items.find(i=>i.id===id);
+  if (!item) return;
+  editingId = id;
+  document.getElementById('addTitle').textContent = 'Edit item';
+  document.getElementById('f-name').value = item.name||'';
+  document.getElementById('f-amount').value = item.amount||'';
+  document.getElementById('f-size').value = item.size||'';
+  document.getElementById('f-date').value = item.dateIn||today();
+  document.getElementById('f-bestbefore').value = item.bestBefore||'';
+  document.getElementById('f-note').value = item.note||'';
+  document.querySelectorAll('.cat-opt').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('copt-'+item.cat)?.classList.add('selected');
+  closeSheet();
+  setTimeout(()=>openSheet('addSheet'),200);
+}
+
+function saveItem() {
+  const name = document.getElementById('f-name').value.trim();
+  const catEl = document.querySelector('.cat-opt.selected');
+  if (!name) { alert('Please enter an item name.'); return; }
+  if (!catEl) { alert('Please select a category.'); return; }
+
+  const catId = catEl.id.replace('copt-','');
+  const item = {
+    id:        editingId || 'FRZ-' + Math.random().toString(36).slice(2,7).toUpperCase(),
+    name,
+    cat:       catId,
+    amount:    document.getElementById('f-amount').value.trim(),
+    size:      document.getElementById('f-size').value.trim(),
+    dateIn:    document.getElementById('f-date').value || today(),
+    bestBefore:document.getElementById('f-bestbefore').value,
+    note:      document.getElementById('f-note').value.trim(),
+    addedBy:   'Me',
+    ts:        new Date().toISOString(),
+  };
+
+  if (editingId) {
+    items = items.map(i => i.id===editingId ? item : i);
+  } else {
+    items.unshift(item);
+  }
+  saveLocal();
+  render();
+  closeSheet();
+  pushToSheet(editingId ? 'updateItem' : 'addItem', {item});
+  if (!editingId) setTimeout(()=>openQRLabel(item), 400);
+}
+
+function removeItem(id) {
+  if (!confirm('Mark this item as used and remove from freezer?')) return;
+  items = items.filter(i=>i.id!==id);
+  saveLocal();
+  render();
+  closeSheet();
+  pushToSheet('removeItem', {id});
+}
+
+// ─── QR LABEL POPUP ──────────────────────────────────────
+function openQRLabel(item) {
+  const cat = CATS.find(c=>c.id===item.cat)||CATS[CATS.length-1];
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent('FRZ:'+item.id)}`;
+  const dateIn = new Date(item.dateIn).toLocaleDateString('en-GB');
+  const expiry = new Date(new Date(item.dateIn).getTime()+LIMIT_DAYS*86400000).toLocaleDateString('en-GB');
+  document.getElementById('detailBody').innerHTML = `
+    <div class="sheet-title">QR Label ready!</div>
+    <p style="font-size:13px;color:var(--text3);margin-bottom:14px;">Screenshot or print this label and attach it to the item before placing in the freezer.</p>
+    <div style="border:2px dashed var(--gray-mid);border-radius:12px;padding:16px;text-align:center;background:#fff;max-width:220px;margin:0 auto 16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">${cat.emoji} ${cat.label}</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;">${item.name}</div>
+      <img src="${qrUrl}" width="120" height="120" style="display:block;margin:0 auto 8px;"/>
+      <div style="font-size:10px;font-family:monospace;color:var(--text3);margin-bottom:6px;">${item.id}</div>
+      <div style="font-size:11px;color:var(--text3);">Frozen: ${dateIn}</div>
+      <div style="font-size:11px;color:var(--text3);">Use by: ${expiry}</div>
+      ${item.amount||item.size?`<div style="font-size:11px;font-weight:600;margin-top:4px;">${item.amount} ${item.size}</div>`:''}
+    </div>
+    <div class="actions">
+      <button class="btn btn-edit" onclick="window.print()">🖨 Print label</button>
+      <button class="btn btn-close" onclick="closeSheet()">Done</button>
+    </div>`;
+  openSheet('detailSheet');
+}
+
+// ─── QR SCAN ─────────────────────────────────────────────
+function startScan() {
+  const id = prompt('Enter QR code ID (e.g. FRZ-AB12C):\n\nTip: Use your phone camera app to scan — it will show the ID automatically.');
+  if (!id) return;
+  const clean = id.replace('FRZ:','').trim().toUpperCase();
+  const item = items.find(i => i.id === clean || i.id === 'FRZ-'+clean);
+  if (item) openDetail(item);
+  else alert('Item not found: ' + clean + '\n\nMake sure the app is synced.');
+}
+
+// ─── SETTINGS ────────────────────────────────────────────
+function showSetup() {
+  document.getElementById('scriptUrl').value = scriptUrl;
+  openSheet('setupSheet');
+}
+function saveSettings() {
+  const url = document.getElementById('scriptUrl').value.trim();
+  if (!url) { alert('Please enter your Apps Script URL.'); return; }
+  scriptUrl = url;
+  localStorage.setItem(URL_KEY, url);
+  closeSheet();
+  syncFromSheet();
+}
+
+// ─── SHEET OPEN/CLOSE ─────────────────────────────────────
+function openSheet(id) {
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById(id).classList.add('open');
+}
+function closeSheet() {
+  document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open'));
+  document.getElementById('overlay').classList.remove('open');
+}
+
+// ─── AUTO-REFRESH ─────────────────────────────────────────
+setInterval(()=>{ if(scriptUrl && navigator.onLine) syncFromSheet(); }, 60000);
+</script>
+</body>
+</html>
