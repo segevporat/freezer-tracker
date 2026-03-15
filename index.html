@@ -340,11 +340,13 @@ async function syncFromSheet() {
     const data = await res.json();
     if (data.items) {
       if (data.items.length > 0) {
-        items = data.items;
+        // Preserve local photos — sheet doesn't store them
+        const photoMap = {};
+        items.forEach(i => { if (i.photo) photoMap[i.id] = i.photo; });
+        items = data.items.map(i => ({...i, photo: photoMap[i.id]||''}));
         saveLocal();
         render();
       }
-      // If sheet returns empty but we have local items, keep local
       setSyncStatus('ok', 'Synced ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
     }
   } catch(e) {
@@ -355,8 +357,10 @@ async function syncFromSheet() {
 async function pushToSheet(action, payload) {
   if (!scriptUrl) return;
   try {
+    // Strip photo before sending to Google Sheets — photos stored locally only
+    let itemForSheet = payload.item ? {...payload.item, photo:''} : undefined;
     let url = scriptUrl + '?action=' + action;
-    if (payload.item) url += '&item=' + encodeURIComponent(JSON.stringify(payload.item));
+    if (itemForSheet) url += '&item=' + encodeURIComponent(JSON.stringify(itemForSheet));
     if (payload.id)   url += '&id=' + encodeURIComponent(payload.id);
     await fetch(url, {cache:'no-store'});
     syncFromSheet();
