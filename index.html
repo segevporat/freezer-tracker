@@ -363,7 +363,9 @@ async function pushToSheet(action, payload) {
     if (itemForSheet) url += '&item=' + encodeURIComponent(JSON.stringify(itemForSheet));
     if (payload.id)   url += '&id=' + encodeURIComponent(payload.id);
     await fetch(url, {cache:'no-store'});
-    syncFromSheet();
+    // Don't re-sync immediately — local data is already correct
+    // Background sync will pick it up in 60 seconds
+    setSyncStatus('ok', 'Saved ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
   } catch(e) {
     setSyncStatus('offline','Offline — will retry');
     queueOfflineAction({action, ...payload});
