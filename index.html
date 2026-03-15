@@ -341,11 +341,10 @@ async function syncFromSheet() {
 async function pushToSheet(action, payload) {
   if (!scriptUrl) return;
   try {
-    await fetch(scriptUrl, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action, ...payload})
-    });
+    let url = scriptUrl + '?action=' + action;
+    if (payload.item) url += '&item=' + encodeURIComponent(JSON.stringify(payload.item));
+    if (payload.id)   url += '&id=' + encodeURIComponent(payload.id);
+    await fetch(url, {cache:'no-store'});
     syncFromSheet();
   } catch(e) {
     setSyncStatus('offline','Offline — will retry');
@@ -364,7 +363,10 @@ async function flushQueue() {
   if (!q.length) return;
   for (const p of q) {
     try {
-      await fetch(scriptUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p)});
+      let url = scriptUrl + '?action=' + p.action;
+      if (p.item) url += '&item=' + encodeURIComponent(JSON.stringify(p.item));
+      if (p.id)   url += '&id=' + encodeURIComponent(p.id);
+      await fetch(url, {cache:'no-store'});
     } catch(e) { return; }
   }
   localStorage.removeItem('freezer_queue');
