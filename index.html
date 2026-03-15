@@ -325,9 +325,12 @@ async function syncFromSheet() {
     const res = await fetch(scriptUrl + '?action=getAll', {cache:'no-store'});
     const data = await res.json();
     if (data.items) {
-      items = data.items;
-      saveLocal();
-      render();
+      if (data.items.length > 0) {
+        items = data.items;
+        saveLocal();
+        render();
+      }
+      // If sheet returns empty but we have local items, keep local
       setSyncStatus('ok', 'Synced ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
     }
   } catch(e) {
@@ -673,6 +676,11 @@ function closeSheet() {
 
 // ─── AUTO-REFRESH ─────────────────────────────────────────
 setInterval(()=>{ if(scriptUrl && navigator.onLine) syncFromSheet(); }, 60000);
+
+// ─── SERVICE WORKER ───────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
 </script>
 </body>
 </html>
