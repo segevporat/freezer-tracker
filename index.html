@@ -143,6 +143,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .cat-opt .emoji{font-size:22px;display:block;margin-bottom:4px;}
 .btn-add{width:100%;padding:14px;background:var(--blue2);color:#fff;border:none;border-radius:var(--rs);font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;}
 .btn-add:active{opacity:0.85;}
+.btn-reuse{width:100%;margin-top:10px;padding:12px;background:var(--green-light);color:var(--green);border:1.5px solid #bbf7d0;border-radius:var(--rs);font-size:14px;font-weight:600;cursor:pointer;text-align:center;}
 
 /* SETUP VIEW */
 .setup-wrap{padding:24px 20px;flex:1;}
@@ -519,7 +520,8 @@ function openDetail(item) {
       <button class="btn btn-use" onclick="removeItem('${item.id}')">✓ Mark as used</button>
       <button class="btn btn-edit" onclick="openEdit('${item.id}')">✏ Edit</button>
       <button class="btn btn-close" onclick="closeSheet()">Close</button>
-    </div>`;
+    </div>
+    <button class="btn-reuse" onclick="openCopy('${item.id}')">📋 Add same again — new date</button>`;
   openSheet('detailSheet');
 }
 
@@ -546,6 +548,23 @@ function openEdit(id) {
   document.getElementById('f-size').value = item.size||'';
   document.getElementById('f-date').value = item.dateIn||today();
   document.getElementById('f-bestbefore').value = item.bestBefore||'';
+  document.getElementById('f-note').value = item.note||'';
+  document.querySelectorAll('.cat-opt').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('copt-'+item.cat)?.classList.add('selected');
+  closeSheet();
+  setTimeout(()=>openSheet('addSheet'),200);
+}
+
+function openCopy(id) {
+  const item = items.find(i=>i.id===id);
+  if (!item) return;
+  editingId = null;
+  document.getElementById('addTitle').textContent = 'Add same again';
+  document.getElementById('f-name').value = item.name||'';
+  document.getElementById('f-amount').value = item.amount||'';
+  document.getElementById('f-size').value = item.size||'';
+  document.getElementById('f-date').value = today();
+  document.getElementById('f-bestbefore').value = '';
   document.getElementById('f-note').value = item.note||'';
   document.querySelectorAll('.cat-opt').forEach(c=>c.classList.remove('selected'));
   document.getElementById('copt-'+item.cat)?.classList.add('selected');
@@ -582,7 +601,6 @@ function saveItem() {
   render();
   closeSheet();
   pushToSheet(editingId ? 'updateItem' : 'addItem', {item});
-  if (!editingId) setTimeout(()=>openQRLabel(item), 400);
 }
 
 function removeItem(id) {
