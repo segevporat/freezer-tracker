@@ -291,6 +291,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
   </div>
   <div class="scanner-hint" id="scannerHint">Point camera at the barcode on the packaging</div>
+  <div id="manualEntry" style="display:none;padding:12px 16px;background:rgba(0,0,0,0.7);">
+    <div style="color:#fff;font-size:13px;margin-bottom:8px;">Type barcode number manually:</div>
+    <div style="display:flex;gap:8px;">
+      <input id="manualBarcode" type="number" placeholder="e.g. 5740900285017" style="flex:1;padding:10px;border-radius:8px;border:none;font-size:15px;"/>
+      <button onclick="submitManual()" style="padding:10px 16px;background:#4ade80;color:#000;border:none;border-radius:8px;font-weight:700;cursor:pointer;">Look up</button>
+    </div>
+  </div>
   <div class="scanner-result" id="scannerResult">
     <h3 id="scannerName"></h3>
     <p id="scannerMeta"></p>
@@ -794,121 +801,151 @@ setInterval(()=>{ if(scriptUrl && navigator.onLine) syncFromSheet(); }, 60000);
 
 // ─── BARCODE SCANNER ─────────────────────────────────────
 let scannerStream = null;
-let scannerInterval = null;
 let scanResult = null;
-let zxing = null;
+let quaggaRunning = false;
 
 async function openScanner() {
   const overlay = document.getElementById('scannerOverlay');
   overlay.classList.add('open');
   document.getElementById('scannerResult').classList.remove('show');
-  document.getElementById('scannerHint').textContent = 'Point camera at the barcode on the packaging';
-
-  // Load ZXing if not loaded
-  if (!zxing) {
-    try {
-      document.getElementById('scannerHint').textContent = 'Loading scanner…';
-      await loadScript('https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js');
-      zxing = new ZXing.BrowserMultiFormatReader();
-      document.getElementById('scannerHint').textContent = 'Point camera at the barcode on the packaging';
-    } catch(e) {
-      document.getElementById('scannerHint').textContent = 'Failed to load scanner. Check internet connection.';
-      return;
-    }
-  }
+  document.getElementById('scannerHint').style.display = 'block';
+  document.getElementById('scannerHint').textContent = 'Loading scanner…';
+  document.getElementById('manualEntry').style.display = 'none';
 
   try {
-    const constraints = {video: {facingMode: 'environment'}};
-    scannerStream = await navigator.mediaDevices.getUserMedia(constraints);
-    const video = document.getElementById('scannerVideo');
-    video.srcObject = scannerStream;
-    await video.play();
-    startDecoding(video);
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js');
+    document.getElementById('scannerHint').textContent = 'Point camera at the barcode — hold steady and close';
+    startQuagga();
   } catch(e) {
-    document.getElementById('scannerHint').textContent = 'Camera access denied. Please allow camera in browser settings.';
+    document.getElementById('scannerHint').textContent = 'Scanner failed to load — enter barcode manually below';
+    document.getElementById('manualEntry').style.display = 'block';
   }
 }
 
-function startDecoding(video) {
-  if (!zxing) return;
-  zxing.decodeFromVideoElement(video, (result, err) => {
-    if (result) {
-      const code = result.getText();
-      stopDecoding();
+function startQuagga() {
+  if (quaggaRunning) { Quagga.stop(); quaggaRunning = false; }
+  const video = document.getElementById('scannerVideo');
+
+  Quagga.init({
+    inputStream: {
+      name: 'Live',
+      type: 'LiveStream',
+      target: video.parentElement,
+      constraints: {
+        facingMode: 'environment',
+        width: {min: 640},
+        height: {min: 480},
+        aspectRatio: {min: 1, max: 2}
+      },
+    },
+    locator: { patchSize: 'medium', halfSample: true },
+    numOfWorkers: 2,
+    frequency: 10,
+    decoder: {
+      readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader', 'code_128_reader']
+    },
+    locate: true
+  }, err => {
+    if (err) {
+      document.getElementById('scannerHint').textContent = 'Camera error: ' + err.message + ' — try manual entry below';
+      document.getElementById('manualEntry').style.display = 'block';
+      return;
+    }
+    Quagga.start();
+    quaggaRunning = true;
+  });
+
+  // Debounce — require same code twice in a row
+  let lastCode = '';
+  Quagga.onDetected(result => {
+    const code = result.codeResult.code;
+    if (code === lastCode) {
+      stopQuagga();
       lookupBarcode(code);
     }
+    lastCode = code;
+    setTimeout(() => { lastCode = ''; }, 1500);
   });
 }
 
-function stopDecoding() {
-  if (zxing) zxing.reset();
+function stopQuagga() {
+  if (quaggaRunning) {
+    try { Quagga.stop(); } catch(e) {}
+    quaggaRunning = false;
+  }
 }
 
 function closeScanner() {
-  stopDecoding();
-  if (scannerStream) {
-    scannerStream.getTracks().forEach(t => t.stop());
-    scannerStream = null;
-  }
+  stopQuagga();
   document.getElementById('scannerOverlay').classList.remove('open');
+  document.getElementById('manualEntry').style.display = 'none';
 }
 
 function retryScanner() {
   document.getElementById('scannerResult').classList.remove('show');
-  document.getElementById('scannerHint').textContent = 'Point camera at the barcode on the packaging';
-  const video = document.getElementById('scannerVideo');
-  startDecoding(video);
+  document.getElementById('scannerHint').style.display = 'block';
+  document.getElementById('scannerHint').textContent = 'Point camera at the barcode — hold steady and close';
+  document.getElementById('manualEntry').style.display = 'none';
+  startQuagga();
+}
+
+function submitManual() {
+  const code = document.getElementById('manualBarcode').value.trim();
+  if (!code) return;
+  document.getElementById('manualEntry').style.display = 'none';
+  lookupBarcode(code);
 }
 
 async function lookupBarcode(code) {
+  stopQuagga();
   document.getElementById('scannerHint').textContent = 'Looking up product…';
   try {
-    const res = await fetch('https://world.openfoodfacts.org/api/v0/product/' + code + '.json');
-    const data = await res.json();
-    if (data.status === 1 && data.product) {
-      const p = data.product;
+    // Try Open Food Facts world + Denmark
+    let data = null;
+    for (const base of ['https://world.openfoodfacts.org', 'https://dk.openfoodfacts.org']) {
+      const res = await fetch(base + '/api/v0/product/' + code + '.json');
+      const json = await res.json();
+      if (json.status === 1 && json.product) { data = json.product; break; }
+    }
+    if (data) {
       scanResult = {
-        name: p.product_name || p.product_name_en || '',
-        brand: p.brands || '',
-        quantity: p.quantity || '',
-        categories: p.categories_tags || [],
+        name:       data.product_name_da || data.product_name_en || data.product_name || '',
+        brand:      data.brands || '',
+        quantity:   data.quantity || '',
+        categories: data.categories_tags || [],
+        code,
       };
-      const displayName = scanResult.brand
-        ? scanResult.brand + ' ' + scanResult.name
-        : scanResult.name;
+      const displayName = [scanResult.brand, scanResult.name].filter(Boolean).join(' ');
       document.getElementById('scannerName').textContent = displayName || 'Unknown product';
       document.getElementById('scannerMeta').textContent =
-        (scanResult.quantity ? scanResult.quantity : '') +
-        (scanResult.brand && scanResult.quantity ? ' · ' : '') +
-        (scanResult.brand ? scanResult.brand : '') +
-        ' · Barcode: ' + code;
+        [scanResult.quantity, 'Barcode: ' + code].filter(Boolean).join(' · ');
       document.getElementById('scannerResult').classList.add('show');
       document.getElementById('scannerHint').style.display = 'none';
     } else {
-      document.getElementById('scannerHint').textContent = 'Product not found (barcode: ' + code + '). Try scanning again or fill in manually.';
+      document.getElementById('scannerHint').textContent = 'Product not found for barcode ' + code + '. Try manual entry.';
+      document.getElementById('manualBarcode').value = code;
+      document.getElementById('manualEntry').style.display = 'block';
     }
   } catch(e) {
-    document.getElementById('scannerHint').textContent = 'Could not look up product. Check internet connection.';
+    document.getElementById('scannerHint').textContent = 'Lookup failed — check internet connection.';
+    document.getElementById('manualEntry').style.display = 'block';
   }
 }
 
 function useScanResult() {
   if (!scanResult) return;
-  const name = (scanResult.brand ? scanResult.brand + ' ' : '') + (scanResult.name || '');
+  const name = [scanResult.brand, scanResult.name].filter(Boolean).join(' ');
   document.getElementById('f-name').value = name.trim();
   if (scanResult.quantity) document.getElementById('f-size').value = scanResult.quantity;
-
-  // Auto-detect category from product categories
-  const cats = (scanResult.categories || []).join(' ').toLowerCase();
-  if (cats.includes('meat') || cats.includes('beef') || cats.includes('chicken') || cats.includes('pork') || cats.includes('lamb')) selectCat('meat');
-  else if (cats.includes('fish') || cats.includes('seafood') || cats.includes('salmon') || cats.includes('tuna')) selectCat('fish');
-  else if (cats.includes('pizza')) selectCat('pizza');
-  else if (cats.includes('bread') || cats.includes('pastry') || cats.includes('bakery')) selectCat('bread');
-  else if (cats.includes('ice') || cats.includes('sorbet') || cats.includes('gelato')) selectCat('icecream');
-  else if (cats.includes('vegetable') || cats.includes('veggie')) selectCat('veggie');
-  else if (cats.includes('dairy') || cats.includes('cheese') || cats.includes('butter')) selectCat('dairy');
-  else if (cats.includes('meal') || cats.includes('ready') || cats.includes('frozen-meal')) selectCat('ready');
-
+  const cats = scanResult.categories.join(' ').toLowerCase();
+  if      (cats.match(/meat|beef|chicken|pork|lamb|poultry/)) selectCat('meat');
+  else if (cats.match(/fish|seafood|salmon|tuna|shrimp/))     selectCat('fish');
+  else if (cats.match(/pizza/))                                selectCat('pizza');
+  else if (cats.match(/bread|pastry|bakery|biscuit/))         selectCat('bread');
+  else if (cats.match(/ice.cream|sorbet|gelato|frozen.dess/)) selectCat('icecream');
+  else if (cats.match(/vegetable|veggie|spinach|broccoli/))   selectCat('veggie');
+  else if (cats.match(/dairy|cheese|butter|milk|cream/))      selectCat('dairy');
+  else if (cats.match(/ready|meal|prepared/))                  selectCat('ready');
   closeScanner();
 }
 
