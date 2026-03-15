@@ -145,6 +145,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-add:active{opacity:0.85;}
 .btn-reuse{width:100%;margin-top:10px;padding:12px;background:var(--green-light);color:var(--green);border:1.5px solid #bbf7d0;border-radius:var(--rs);font-size:14px;font-weight:600;cursor:pointer;text-align:center;}
 
+/* BARCODE SCANNER */
+.scanner-overlay{display:none;position:fixed;inset:0;background:#000;z-index:200;flex-direction:column;}
+.scanner-overlay.open{display:flex;}
+.scanner-topbar{display:flex;align-items:center;justify-content:space-between;padding:16px;background:rgba(0,0,0,0.7);}
+.scanner-topbar span{color:#fff;font-size:16px;font-weight:600;}
+.scanner-close{background:rgba(255,255,255,0.2);border:none;color:#fff;padding:8px 16px;border-radius:20px;font-size:14px;cursor:pointer;}
+.scanner-wrap{flex:1;position:relative;overflow:hidden;}
+.scanner-wrap video{width:100%;height:100%;object-fit:cover;}
+.scanner-frame{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+.scanner-box{width:260px;height:160px;border:3px solid #4ade80;border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,0.5);}
+.scanner-line{position:absolute;width:240px;height:2px;background:#4ade80;animation:scan 2s ease-in-out infinite;}
+@keyframes scan{0%,100%{top:calc(50% - 70px)}50%{top:calc(50% + 70px)}}
+.scanner-hint{color:#fff;font-size:13px;text-align:center;padding:16px;background:rgba(0,0,0,0.7);}
+.scanner-result{display:none;background:#fff;padding:16px 20px;border-radius:20px 20px 0 0;}
+.scanner-result.show{display:block;}
+.scanner-result h3{font-size:16px;font-weight:700;margin-bottom:4px;}
+.scanner-result p{font-size:13px;color:var(--text3);margin-bottom:12px;}
+.scanner-result .actions{display:flex;gap:8px;}
+
 /* SETUP VIEW */
 .setup-wrap{padding:24px 20px;flex:1;}
 .setup-wrap h2{font-size:20px;font-weight:700;margin-bottom:8px;}
@@ -206,10 +225,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="sheet" id="addSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-body">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
       <div class="form-title" id="addTitle" style="margin-bottom:0;">Add item to freezer</div>
       <button onclick="closeSheet()" style="background:var(--gray-light);border:none;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer;color:var(--text3);display:flex;align-items:center;justify-content:center;">✕</button>
     </div>
+    <button onclick="openScanner()" style="width:100%;margin-bottom:14px;padding:11px;background:var(--blue-light);color:var(--blue2);border:1.5px solid var(--blue-mid);border-radius:var(--rs);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">📦 Scan barcode to auto-fill</button>
     <div class="field">
       <label>Category</label>
       <div class="cat-grid" id="catGrid"></div>
@@ -254,6 +274,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </label>
     </div>
     <button class="btn-add" onclick="saveItem()">Save item</button>
+  </div>
+</div>
+
+<!-- BARCODE SCANNER -->
+<div class="scanner-overlay" id="scannerOverlay">
+  <div class="scanner-topbar">
+    <span>📦 Scan barcode</span>
+    <button class="scanner-close" onclick="closeScanner()">Cancel</button>
+  </div>
+  <div class="scanner-wrap">
+    <video id="scannerVideo" playsinline autoplay muted></video>
+    <div class="scanner-frame">
+      <div class="scanner-box"></div>
+      <div class="scanner-line"></div>
+    </div>
+  </div>
+  <div class="scanner-hint" id="scannerHint">Point camera at the barcode on the packaging</div>
+  <div class="scanner-result" id="scannerResult">
+    <h3 id="scannerName"></h3>
+    <p id="scannerMeta"></p>
+    <div class="actions">
+      <button class="btn btn-edit" onclick="useScanResult()">Use this product</button>
+      <button class="btn btn-close" onclick="retryScanner()">Scan again</button>
+    </div>
   </div>
 </div>
 
@@ -747,6 +791,137 @@ function closeSheet() {
 
 // ─── AUTO-REFRESH ─────────────────────────────────────────
 setInterval(()=>{ if(scriptUrl && navigator.onLine) syncFromSheet(); }, 60000);
+
+// ─── BARCODE SCANNER ─────────────────────────────────────
+let scannerStream = null;
+let scannerInterval = null;
+let scanResult = null;
+let zxing = null;
+
+async function openScanner() {
+  const overlay = document.getElementById('scannerOverlay');
+  overlay.classList.add('open');
+  document.getElementById('scannerResult').classList.remove('show');
+  document.getElementById('scannerHint').textContent = 'Point camera at the barcode on the packaging';
+
+  // Load ZXing if not loaded
+  if (!zxing) {
+    try {
+      document.getElementById('scannerHint').textContent = 'Loading scanner…';
+      await loadScript('https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js');
+      zxing = new ZXing.BrowserMultiFormatReader();
+      document.getElementById('scannerHint').textContent = 'Point camera at the barcode on the packaging';
+    } catch(e) {
+      document.getElementById('scannerHint').textContent = 'Failed to load scanner. Check internet connection.';
+      return;
+    }
+  }
+
+  try {
+    const constraints = {video: {facingMode: 'environment'}};
+    scannerStream = await navigator.mediaDevices.getUserMedia(constraints);
+    const video = document.getElementById('scannerVideo');
+    video.srcObject = scannerStream;
+    await video.play();
+    startDecoding(video);
+  } catch(e) {
+    document.getElementById('scannerHint').textContent = 'Camera access denied. Please allow camera in browser settings.';
+  }
+}
+
+function startDecoding(video) {
+  if (!zxing) return;
+  zxing.decodeFromVideoElement(video, (result, err) => {
+    if (result) {
+      const code = result.getText();
+      stopDecoding();
+      lookupBarcode(code);
+    }
+  });
+}
+
+function stopDecoding() {
+  if (zxing) zxing.reset();
+}
+
+function closeScanner() {
+  stopDecoding();
+  if (scannerStream) {
+    scannerStream.getTracks().forEach(t => t.stop());
+    scannerStream = null;
+  }
+  document.getElementById('scannerOverlay').classList.remove('open');
+}
+
+function retryScanner() {
+  document.getElementById('scannerResult').classList.remove('show');
+  document.getElementById('scannerHint').textContent = 'Point camera at the barcode on the packaging';
+  const video = document.getElementById('scannerVideo');
+  startDecoding(video);
+}
+
+async function lookupBarcode(code) {
+  document.getElementById('scannerHint').textContent = 'Looking up product…';
+  try {
+    const res = await fetch('https://world.openfoodfacts.org/api/v0/product/' + code + '.json');
+    const data = await res.json();
+    if (data.status === 1 && data.product) {
+      const p = data.product;
+      scanResult = {
+        name: p.product_name || p.product_name_en || '',
+        brand: p.brands || '',
+        quantity: p.quantity || '',
+        categories: p.categories_tags || [],
+      };
+      const displayName = scanResult.brand
+        ? scanResult.brand + ' ' + scanResult.name
+        : scanResult.name;
+      document.getElementById('scannerName').textContent = displayName || 'Unknown product';
+      document.getElementById('scannerMeta').textContent =
+        (scanResult.quantity ? scanResult.quantity : '') +
+        (scanResult.brand && scanResult.quantity ? ' · ' : '') +
+        (scanResult.brand ? scanResult.brand : '') +
+        ' · Barcode: ' + code;
+      document.getElementById('scannerResult').classList.add('show');
+      document.getElementById('scannerHint').style.display = 'none';
+    } else {
+      document.getElementById('scannerHint').textContent = 'Product not found (barcode: ' + code + '). Try scanning again or fill in manually.';
+    }
+  } catch(e) {
+    document.getElementById('scannerHint').textContent = 'Could not look up product. Check internet connection.';
+  }
+}
+
+function useScanResult() {
+  if (!scanResult) return;
+  const name = (scanResult.brand ? scanResult.brand + ' ' : '') + (scanResult.name || '');
+  document.getElementById('f-name').value = name.trim();
+  if (scanResult.quantity) document.getElementById('f-size').value = scanResult.quantity;
+
+  // Auto-detect category from product categories
+  const cats = (scanResult.categories || []).join(' ').toLowerCase();
+  if (cats.includes('meat') || cats.includes('beef') || cats.includes('chicken') || cats.includes('pork') || cats.includes('lamb')) selectCat('meat');
+  else if (cats.includes('fish') || cats.includes('seafood') || cats.includes('salmon') || cats.includes('tuna')) selectCat('fish');
+  else if (cats.includes('pizza')) selectCat('pizza');
+  else if (cats.includes('bread') || cats.includes('pastry') || cats.includes('bakery')) selectCat('bread');
+  else if (cats.includes('ice') || cats.includes('sorbet') || cats.includes('gelato')) selectCat('icecream');
+  else if (cats.includes('vegetable') || cats.includes('veggie')) selectCat('veggie');
+  else if (cats.includes('dairy') || cats.includes('cheese') || cats.includes('butter')) selectCat('dairy');
+  else if (cats.includes('meal') || cats.includes('ready') || cats.includes('frozen-meal')) selectCat('ready');
+
+  closeScanner();
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
 
 // ─── SERVICE WORKER ───────────────────────────────────────
 if ('serviceWorker' in navigator) {
